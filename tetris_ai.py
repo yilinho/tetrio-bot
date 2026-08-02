@@ -26,16 +26,20 @@ dead_board[:, 0] = 1
 def find_best_move(current_board, current_piece, next_pieces, held_piece, combo, b2b, pruning_moves, pruning_breadth, mp_pool):
     all_moves = []
 
-    # try to release T when there's t-slot, try to hold otherwise
-    switch_extra = 0
-    board_terrain = _get_board_terrain(current_board)
-    t_slots = get_t_slots(current_board, board_terrain)
-    if held_piece == "T":
-        switch_extra -= 60
-    if current_piece == "T":
-        switch_extra += 60
-    if len(t_slots) > 0 and t_slots[0][4] > 1:
-        switch_extra = 0  # -switch_extra
+    # Calculate the first-move Hold preference.
+    # Try to release T when there's t-slot, hold it otherwise
+    # It is carried through lookahead to preserve its full score weight.
+    if held_piece != current_piece and (held_piece == "T" or current_piece == "T"):
+        board_terrain = _get_board_terrain(current_board)
+        t_slots = get_t_slots(current_board, board_terrain)
+        if len(t_slots) > 0 and t_slots[0][4] > 1:  # t_slots is sorted
+            switch_extra = 0
+        elif held_piece == "T":
+            switch_extra = -60
+        else:
+            switch_extra = 60
+    else:
+        switch_extra = 0
 
     for new_score, position, rotations, extra_score, new_combo, new_b2b, new_board in _find_best_move(
         (current_board, current_piece, combo, b2b)
