@@ -30,7 +30,7 @@ def find_best_move(current_board, current_piece, next_pieces, held_piece, combo,
     if held_piece != current_piece and (held_piece == "T" or current_piece == "T"):
         board_terrain = _get_board_terrain(current_board)
         t_slots = get_t_slots(current_board, board_terrain)
-        if len(t_slots) > 0 and t_slots[0][4] > 1:  # t_slots is sorted
+        if len(t_slots) > 0 and t_slots[0][3] > 1:  # t_slots is sorted
             switch_extra = 0
         elif held_piece == "T":
             switch_extra = -weights.HOLD_T_PREFERENCE
@@ -112,7 +112,7 @@ def find_best_move(current_board, current_piece, next_pieces, held_piece, combo,
 
 def get_all_possible_moves(piece, board, board_terrain, b2b):
     if piece == "T":  # t-spin moves
-        for rot, pos, _, expected_lines, actual_lines, blocks in get_t_slots(board, board_terrain):
+        for rot, pos, expected_lines, actual_lines, blocks in get_t_slots(board, board_terrain):
             new_board = board.copy()
             for y, x in blocks:
                 new_board[y][x] = 1
@@ -306,7 +306,7 @@ def evaluate_board(board):
 
     # The number of holes - find number of 0s with 1s above
     row_holes = ((board == 0) & (np.cumsum(board, axis=0) < np.sum(board, axis=0))).sum(axis=1)
-    score += weights.HOLE_PENALTY * np.sum(row_holes)
+    score += weights.HOLE_PENALTY * (np.sum(row_holes) ** 1.3)
 
     # The number of blockades - find number of 1s above holes
     blockades = np.sum(board & (np.cumsum(board, axis=0) < full_board_cumsum))
@@ -338,14 +338,15 @@ def evaluate_board(board):
     # t slots logic below
     t_slots = get_t_slots(board, board_terrain, row_holes=row_holes)
     triple_count = 0
-    for _, pos, max_lines, expected_lines, actual_lines, _ in t_slots:
-        if max_lines == 3 and current_max_height < TRIPLE_T_SPIN_MAX_HEIGHT:
+    for _, pos, expected_lines, actual_lines, _ in t_slots:
+        if expected_lines == 3:
             triple_count += 1
-            score += weights.TRIPLE_T_SPIN_REWARD + actual_lines * weights.TRIPLE_T_SPIN_LINE_WEIGHT
-        score += weights.T_SLOT_LINE_WEIGHT * actual_lines - weights.T_SLOT_EXPECTED_LINE_PENALTY * (max_lines - expected_lines)
+            if current_max_height < TRIPLE_T_SPIN_MAX_HEIGHT:
+                score += weights.TRIPLE_T_SPIN_REWARD + actual_lines * weights.TRIPLE_T_SPIN_LINE_WEIGHT
+        score += weights.T_SLOT_LINE_WEIGHT * actual_lines + weights.T_SLOT_EXPECTED_LINE_PENALTY * (expected_lines - actual_lines)
     if triple_count > 1:
         score += weights.MULTIPLE_TRIPLE_T_SPIN_PENALTY * triple_count
     if current_max_height < T_SPIN_MAX_HEIGHT and len(t_slots) == 1:  # try to make t-spin from scratch
-        score += weights.LOW_BOARD_T_SLOT_REWARD * t_slots[0][3]
+        score += weights.LOW_BOARD_T_SLOT_REWARD * t_slots[0][2]
 
     return score
