@@ -7,12 +7,10 @@ from spin_i import get_i_slots
 from spin_jl import get_j_slots, get_l_slots
 from spin_t import get_t_slots, get_mini_t_slots
 from spin_zs import get_s_slots, get_z_slots
+import weights
 
 T_SPIN_MAX_HEIGHT = 10
 TRIPLE_T_SPIN_MAX_HEIGHT = 8
-
-ALL_SPIN_B2B = True
-
 
 # belows are masks and constants to speedup calculation
 range_1_20 = np.array(list(range(1, NUM_ROW + 1)))
@@ -35,9 +33,9 @@ def find_best_move(current_board, current_piece, next_pieces, held_piece, combo,
         if len(t_slots) > 0 and t_slots[0][4] > 1:  # t_slots is sorted
             switch_extra = 0
         elif held_piece == "T":
-            switch_extra = -60
+            switch_extra = -weights.HOLD_T_PREFERENCE
         else:
-            switch_extra = 60
+            switch_extra = weights.HOLD_T_PREFERENCE
     else:
         switch_extra = 0
 
@@ -86,28 +84,28 @@ def find_best_move(current_board, current_piece, next_pieces, held_piece, combo,
             for score, board, extra_score, combo, b2b, held_piece in all_moves[idx][1]:
                 for new_score, _, _, new_extra_score, new_combo, new_b2b, new_board in next(map_res):
                     next_results[idx].append((
-                        0.1 * score + 0.9 * (new_score + extra_score + (switch_extra if switch else 0)), new_board,
+                        weights.CURRENT_MOVE_WEIGHT * score + weights.LOOKAHEAD_WEIGHT * (new_score + extra_score + (switch_extra if switch else 0)), new_board,
                         extra_score + new_extra_score, new_combo, new_b2b, held_piece
                     ))
 
                 if held_piece != current_piece:  # no point to switch
                     for new_score, _, _, new_extra_score, new_combo, new_b2b, new_board in next(map_res):
                         next_results[idx].append((
-                            0.1 * score + 0.9 * (new_score + extra_score + (switch_extra if switch else 0)), new_board,
+                            weights.CURRENT_MOVE_WEIGHT * score + weights.LOOKAHEAD_WEIGHT * (new_score + extra_score + (switch_extra if switch else 0)), new_board,
                             extra_score + new_extra_score, new_combo, new_b2b, current_piece
                         ))
 
         for idx, _ in enumerate(all_moves):
             next_results[idx].sort(reverse=True, key=lambda x: x[0])
             if not next_results[idx]:
-                all_moves[idx][1] = [(-99999, dead_board, 0, 0, 0, "Z")]
+                all_moves[idx][1] = [(weights.DEAD_MOVE_SCORE, dead_board, 0, 0, 0, "Z")]
             else:
                 all_moves[idx][1] = next_results[idx][:pruning_breadth]
         all_moves.sort(reverse=True, key=lambda x: x[1][0][0])
         all_moves = all_moves[:max(pruning_moves, len(all_moves) // 2)]
 
     if not all_moves:
-        return -99999, (5, (0,), False, 0, 0, dead_board)
+        return weights.DEAD_MOVE_SCORE, (5, (0,), False, 0, 0, dead_board)
     best_move = all_moves[0]
     return best_move[1][0][0], best_move[0]
 
@@ -126,14 +124,14 @@ def get_all_possible_moves(piece, board, board_terrain, b2b):
             if num_clear_rows > 0:
                 if b2b:
                     if actual_lines == expected_lines:
-                        extra_score += 300 + 100 * actual_lines * actual_lines
+                        extra_score += weights.T_SPIN_B2B_BASE + weights.T_SPIN_B2B_LINE_WEIGHT * actual_lines * actual_lines
                     else:
-                        extra_score += 100 + 40 * actual_lines
+                        extra_score += weights.T_SPIN_B2B_INCOMPLETE_BASE + weights.T_SPIN_B2B_INCOMPLETE_LINE_WEIGHT * actual_lines
                 else:
                     if actual_lines == expected_lines:
-                        extra_score += 200 + 50 * actual_lines * actual_lines
+                        extra_score += weights.T_SPIN_NORMAL_BASE + weights.T_SPIN_NORMAL_LINE_WEIGHT * actual_lines * actual_lines
                     else:
-                        extra_score += 50 + 10 * actual_lines
+                        extra_score += weights.T_SPIN_INCOMPLETE_BASE + weights.T_SPIN_INCOMPLETE_LINE_WEIGHT * actual_lines
                 new_b2b = b2b + 1
             else:
                 new_b2b = b2b
@@ -149,9 +147,9 @@ def get_all_possible_moves(piece, board, board_terrain, b2b):
             extra_score = 0
             if num_clear_rows > 0:
                 if b2b:
-                    extra_score += 130 * num_clear_rows
+                    extra_score += weights.MINI_T_SPIN_B2B_LINE_WEIGHT * num_clear_rows
                 else:
-                    extra_score += 70 * num_clear_rows
+                    extra_score += weights.MINI_T_SPIN_LINE_WEIGHT * num_clear_rows
                 new_b2b = b2b + 1
             else:
                 new_b2b = b2b
@@ -180,12 +178,11 @@ def get_all_possible_moves(piece, board, board_terrain, b2b):
 
             extra_score = 0
             if num_clear_rows > 0:
-                # extra_score += 3000
-                if ALL_SPIN_B2B:
+                if weights.ALL_SPIN_B2B:
                     if b2b:
-                        extra_score += 80 * num_clear_rows
+                        extra_score += weights.ALL_SPIN_B2B_LINE_WEIGHT * num_clear_rows
                     else:
-                        extra_score += 30 * num_clear_rows
+                        extra_score += weights.ALL_SPIN_NORMAL_LINE_WEIGHT * num_clear_rows
                     new_b2b = b2b + 1
                 else:
                     new_b2b = 0
@@ -221,22 +218,19 @@ def _find_best_move(args):
         else:
             new_combo = 0
         score = evaluate_board(new_board)
-        if score > 8000:  # perfect situation
+        if score > weights.PERFECT_SITUATION_THRESHOLD:
             return (score, position, rotations, score, combo + 1, new_b2b, new_board),
 
         if num_clear_rows == 4:
             if b2b:
-                return (score + 600, position, rotations, 600, combo + 1, new_b2b, new_board),
-            return (score + 400, position, rotations, 400, combo + 1, new_b2b, new_board),
-        if new_combo > 2:
-            extra_score += 20
-        if new_combo > 6:
-            extra_score += 20
-        if new_combo > 17:
-            extra_score += 30
+                return (score + weights.TETRIS_B2B_BONUS, position, rotations, weights.TETRIS_B2B_BONUS, combo + 1, new_b2b, new_board),
+            return (score + weights.TETRIS_NORMAL_BONUS, position, rotations, weights.TETRIS_NORMAL_BONUS, combo + 1, new_b2b, new_board),
+        for combo_threshold, combo_bonus in weights.COMBO_BONUS_THRESHOLDS:
+            if new_combo > combo_threshold:
+                extra_score += combo_bonus
 
         if b2b > new_b2b:  # lost b2b
-            extra_score -= 500
+            extra_score += weights.B2B_LOSS_PENALTY
         scores.append((score + extra_score, position, rotations, extra_score, new_combo, new_b2b, new_board))
     return scores
 
@@ -283,7 +277,6 @@ def evaluate_board(board):
     score = 0
 
     board_terrain = _get_board_terrain(board)
-    board_terrain_sorted = sorted(board_terrain)
 
     i_slot_count = 0
     if board_terrain[0] + 2 < board_terrain[1]:
@@ -307,55 +300,52 @@ def evaluate_board(board):
         if board_terrain[i] > board_terrain[i-1] + 2 and board_terrain[i] > board_terrain[i+1] + 2:
             tower_count += 1
 
-    score -= 20 * i_slot_count * i_slot_count  # prevent multiple i slot
-    score -= 50 * i_slot_count_too_high
-    score -= 50 * tower_count
+    score += weights.I_SLOT_PENALTY * (i_slot_count ** 3)  # prevent multiple i slot
+    score += weights.HIGH_I_SLOT_PENALTY * i_slot_count_too_high
+    score += weights.TOWER_PENALTY * tower_count
 
     # The number of holes - find number of 0s with 1s above
     row_holes = ((board == 0) & (np.cumsum(board, axis=0) < np.sum(board, axis=0))).sum(axis=1)
-    score -= 60 * np.sum(row_holes)
+    score += weights.HOLE_PENALTY * np.sum(row_holes)
 
     # The number of blockades - find number of 1s above holes
     blockades = np.sum(board & (np.cumsum(board, axis=0) < full_board_cumsum))
-    score -= 25 * blockades
+    score += weights.BLOCKADE_PENALTY * blockades
 
-    if board_terrain_sorted[-1] == 0:  # prefect clear
+    board_terrain_sorted = sorted(board_terrain)
+    current_max_height = board_terrain_sorted[-1]
+    if current_max_height == 0:  # prefect clear
         print("Prefect clear !!")
-        return 9999
+        return weights.PERFECT_CLEAR_SCORE
 
-    if board_terrain_sorted[-1] >= 7:
-        score -= board_terrain_sorted[-1]
-    if board_terrain_sorted[-1] >= 12:
-        score -= 2 * board_terrain_sorted[-1]
-    if board_terrain_sorted[-1] >= 14:
-        score -= 5 * board_terrain_sorted[-1]
-    if board_terrain_sorted[-1] >= 16:
-        score -= 5 * board_terrain_sorted[-1] * board_terrain_sorted[-1]
+    for _threshold, _linear_weight, _quadratic_weight in weights.HEIGHT_PENALTIES:
+        if current_max_height >= _threshold:
+            score += _linear_weight * current_max_height
+            score += _quadratic_weight * current_max_height * current_max_height
 
-    score -= 10 * (board_terrain_sorted[-1] - board_terrain_sorted[1])  # second lowest
-    diff_for_highest_2 = board_terrain_sorted[-1] - board_terrain_sorted[-2]
-    score -= 10 * diff_for_highest_2 * diff_for_highest_2 * (diff_for_highest_2 - 1)  # make sure no single high column
+    score += weights.SECOND_LOWEST_HEIGHT_PENALTY * (current_max_height - board_terrain_sorted[1])  # second lowest because of i-slot
+    diff_for_highest_2 = current_max_height - board_terrain_sorted[-2]
+    score += weights.ISOLATED_HIGH_COLUMN_PENALTY * diff_for_highest_2 * diff_for_highest_2 * (diff_for_highest_2 - 1)  # make sure no single high column
 
     # try to make every column lower
     for h in board_terrain_sorted:
-        if h > 12:
-            score -= 5 * h * h
-        elif h > 6:
-            score -= 2 * h * (h - 5)
-        else:
-            score -= h
+        for _threshold, _linear_weight, _quadratic_weight in weights.COLUMN_HEIGHT_PENALTIES:
+            if h >= _threshold:
+                score += _linear_weight * h
+                score += _quadratic_weight * h * h
+                break
 
     # t slots logic below
     t_slots = get_t_slots(board, board_terrain, row_holes=row_holes)
     triple_count = 0
     for _, pos, max_lines, expected_lines, actual_lines, _ in t_slots:
-        if max_lines == 3 and board_terrain_sorted[-1] < TRIPLE_T_SPIN_MAX_HEIGHT:
+        if max_lines == 3 and current_max_height < TRIPLE_T_SPIN_MAX_HEIGHT:
             triple_count += 1
-            score += 300 + actual_lines * 100
-        score += 80 * actual_lines - 50 * (max_lines - expected_lines)
+            score += weights.TRIPLE_T_SPIN_REWARD + actual_lines * weights.TRIPLE_T_SPIN_LINE_WEIGHT
+        score += weights.T_SLOT_LINE_WEIGHT * actual_lines - weights.T_SLOT_EXPECTED_LINE_PENALTY * (max_lines - expected_lines)
     if triple_count > 1:
-        score -= 500 * triple_count
-    if max(board_terrain) < T_SPIN_MAX_HEIGHT and len(t_slots) == 1:  # try to make t-spin from scratch
-        score += 40 * t_slots[0][3]
+        score += weights.MULTIPLE_TRIPLE_T_SPIN_PENALTY * triple_count
+    if current_max_height < T_SPIN_MAX_HEIGHT and len(t_slots) == 1:  # try to make t-spin from scratch
+        score += weights.LOW_BOARD_T_SLOT_REWARD * t_slots[0][3]
 
     return score

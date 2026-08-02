@@ -33,6 +33,7 @@ not required because configuration loading is automatic.
 | `bot.py` | Application entry point, command-line arguments, configuration loading/saving, and calibration wizard |
 | `tetrio.py` | `TetrioBot` runtime: screenshots, piece/board recognition, keyboard input, and game loop |
 | `tetris_ai.py` | AI move search, board evaluation, lookahead, pruning, Hold, Combo, and B2B logic |
+| `weights.py` | Centralized AI scoring weights for board features, line clears, spins, Combo, B2B, and lookahead |
 | `constants.py` | Board dimensions, piece shapes, colors, and default configuration values |
 | `spin_i.py` | I-piece spin/slot detection |
 | `spin_t.py` | T-spin and mini T-spin detection |
