@@ -1,3 +1,5 @@
+"""Detect T-spin and mini T-spin placements."""
+
 import numpy as np
 
 from constants import NUM_COL

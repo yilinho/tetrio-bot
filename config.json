@@ -29,5 +29,8 @@
   ],
   "move_delay_ms": 35,
   "action_delay_ms": 50,
-  "delay_variance_percent": 30
+  "delay_variance_percent": 30,
+  "pruning_moves": 5,
+  "pruning_breadth": 5,
+  "mp": 16
 }

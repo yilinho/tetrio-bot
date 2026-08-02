@@ -1,3 +1,5 @@
+"""Detect special S/Z-piece slots and spin placements."""
+
 from constants import NUM_COL
 
 

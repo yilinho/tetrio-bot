@@ -18,8 +18,27 @@ https://youtu.be/nqyY3mnWVAE
 
 3. Start the bot with your saved configuration:
     ```bash
-    python bot.py --use-config
+    python bot.py
     ```
+
+The bot always loads `config.json`. Command-line options such as `--mp` and
+`--delay` override the corresponding values from that file for the current run.
+The legacy `--use-config` option is still accepted for compatibility, but it is
+not required because configuration loading is automatic.
+
+## Project Structure
+
+| File | Purpose |
+|------|---------|
+| `bot.py` | Application entry point, command-line arguments, configuration loading/saving, and calibration wizard |
+| `tetrio.py` | `TetrioBot` runtime: screenshots, piece/board recognition, keyboard input, and game loop |
+| `tetris_ai.py` | AI move search, board evaluation, lookahead, pruning, Hold, Combo, and B2B logic |
+| `constants.py` | Board dimensions, piece shapes, colors, and default configuration values |
+| `spin_i.py` | I-piece spin/slot detection |
+| `spin_t.py` | T-spin and mini T-spin detection |
+| `spin_zs.py` | S/Z spin detection |
+| `spin_jl.py` | J/L spin detection (currently limited/incomplete) |
+| `config.json` | Screen calibration and runtime settings |
 
 ## Calibration
 
@@ -56,6 +75,7 @@ After successful calibration, your settings are saved to `config.json`. This fil
 - Next piece positions
 - Held piece position
 - AI parameters (multiprocessing workers, pruning settings)
+- Delay settings
 
 ## Usage
 
@@ -64,10 +84,10 @@ After successful calibration, your settings are saved to `config.json`. This fil
 | Option | Description |
 |--------|-------------|
 | `--calibrate` | Run the interactive calibration wizard |
-| `--use-config` | Load settings from `config.json` |
-| `--mp N` | Override multiprocessing workers (default: 4) |
-| `--pruning-moves N` | Override pruning moves parameter |
-| `--pruning-breadth N` | Override pruning breadth parameter |
+| `--use-config` | Legacy compatibility option; configuration is loaded automatically |
+| `--mp N` | Override multiprocessing workers from `config.json` |
+| `--pruning-moves N` | Override pruning moves from `config.json` |
+| `--pruning-breadth N` | Override pruning breadth from `config.json` |
 | `--delay N` | Override move delay in milliseconds (default: 30) |
 | `--action-delay N` | Override action delay in milliseconds (default: 50) |
 | `--delay-variance N` | Override delay variance percentage (default: 20) |
@@ -79,19 +99,16 @@ After successful calibration, your settings are saved to `config.json`. This fil
 python bot.py --calibrate
 
 # Run bot with saved configuration
-python bot.py --use-config
+python bot.py
 
 # Run with custom performance settings
-python bot.py --use-config --mp 8
+python bot.py --mp 8
 
 # Run with custom AI parameters
-python bot.py --use-config --mp 8 --pruning-moves 3 --pruning-breadth 5
+python bot.py --mp 8 --pruning-moves 3 --pruning-breadth 5
 
 # Run with custom delay settings (more human-like)
-python bot.py --use-config --delay 50 --action-delay 80 --delay-variance 30
-
-# Run without config (uses hardcoded defaults)
-python bot.py
+python bot.py --delay 50 --action-delay 80 --delay-variance 30
 ```
 
 ## Delay Settings (Anti-Cheat)
@@ -131,7 +148,10 @@ The variance makes timing less predictable. For example, with a 30ms base delay 
   "held_piece_xy": [615, 191],
   "move_delay_ms": 30,
   "action_delay_ms": 50,
-  "delay_variance_percent": 20
+  "delay_variance_percent": 20,
+  "pruning_moves": 5,
+  "pruning_breadth": 5,
+  "mp": 16
 }
 ```
 
@@ -146,7 +166,7 @@ The variance makes timing less predictable. For example, with a 30ms base delay 
 
 ### Manual Configuration (Legacy)
 
-If you prefer not to use the calibration wizard, you can still manually adjust the parameters in `bot.py`:
+If you prefer not to use the calibration wizard, you can manually adjust the parameters in `config.json`:
 ```python
 screen_resolution=(1920, 1080),
 board_top_left=(787, 220),
@@ -162,6 +182,7 @@ For optimal bot performance, configure TETR.IO with these settings:
 - **ARR**: 0ms
 - **DAS**: 40ms
 - **SDF**: max
+- **Video & Interface**: Minimal
 
 ## Troubleshooting
 
@@ -181,7 +202,6 @@ For optimal bot performance, configure TETR.IO with these settings:
 
 - Python 3.x
 - pyautogui
-- mss
 - numpy
 - See `requirements.txt` for full list
 

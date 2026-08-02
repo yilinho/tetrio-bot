@@ -1,7 +1,17 @@
+"""Shared board dimensions, colors, piece shapes, and default settings."""
+
 import numpy as np
 
 NUM_COL = 10
 NUM_ROW = 20
+
+# Default delay settings (in milliseconds)
+DEFAULT_MOVE_DELAY_MS = 30
+DEFAULT_ACTION_DELAY_MS = 50
+DEFAULT_DELAY_VARIANCE_PERCENT = 20
+DEFAULT_PRUNING_MOVES = 5
+DEFAULT_PRUNING_BREADTH = 5
+DEFAULT_MP = 16
 
 # Colors for tetrio
 colors = [

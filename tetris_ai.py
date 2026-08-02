@@ -1,3 +1,5 @@
+"""Search and evaluate candidate TETR.IO moves."""
+
 import numpy as np
 
 from constants import tetris_pieces_trimmed, NUM_ROW, NUM_COL
