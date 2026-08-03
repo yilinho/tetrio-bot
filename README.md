@@ -54,7 +54,7 @@ python bot.py --calibrate
 
 ### Calibration Steps
 
-The wizard guides you through 5 steps to capture the necessary screen positions:
+The wizard guides you through 6 steps to capture the necessary screen positions and timing settings:
 
 | Step | What to Capture | Description |
 |------|-----------------|-------------|
@@ -63,6 +63,7 @@ The wizard guides you through 5 steps to capture the necessary screen positions:
 | 3 | Next Piece #1 | Move mouse to the center of the first (topmost) next piece preview |
 | 4 | Next Piece #5 | Move mouse to the center of the fifth (bottommost) next piece preview |
 | 5 | Held Piece | Move mouse to the center of the held piece display |
+| 6 | Delay Settings | Configure movement, action, and delay variance settings |
 
 ### Controls During Calibration
 
@@ -205,6 +206,8 @@ For optimal bot performance, configure TETR.IO with these settings:
 - Python 3.x
 - pyautogui
 - numpy
+- mypy
+- ruff
 - See `requirements.txt` for full list
 
 ## Disclaimer
