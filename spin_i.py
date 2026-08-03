@@ -1,10 +1,11 @@
 """Detect special I-piece slots and spin placements."""
 
 from constants import NUM_COL
+from type_defs import Board, SpinSlot
 
 
-def get_i_slots(board, board_terrain):
-    slots = []
+def get_i_slots(board: Board, board_terrain: list[int]) -> list[SpinSlot]:
+    slots: list[SpinSlot] = []
 
     if max(board_terrain) > 14:
         return []

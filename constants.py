@@ -1,6 +1,7 @@
 """Shared board dimensions, colors, piece shapes, and default settings."""
 
 import numpy as np
+from numpy.typing import NDArray
 
 NUM_COL = 10
 NUM_ROW = 20
@@ -61,7 +62,7 @@ tetris_pieces = {
     ]
 }
 
-tetris_pieces_trimmed = {}
+tetris_pieces_trimmed: dict[str, list[tuple[NDArray[np.int32], NDArray[np.int64]]]] = {}
 for k, shapes in tetris_pieces.items():
     tetris_pieces_trimmed[k] = []
     for piece_shape in shapes:

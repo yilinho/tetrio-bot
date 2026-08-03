@@ -3,6 +3,7 @@
 import numpy as np
 
 from constants import NUM_COL
+from type_defs import Board, SpinSlotT
 
 t_spin_triple_mask_2spin_left = np.array([
         [0, 1, 1],
@@ -23,13 +24,9 @@ stsd_dont_care_mask = np.array([
 )
 
 
-def get_t_slots(
-        board, board_terrain, row_holes=None
-) -> list[tuple[tuple[int, int], int, int, int, tuple[tuple[int, int], tuple[int, int], tuple[int, int], tuple[int, int]]]]:
-    slots = []
+def get_t_slots(board: Board, board_terrain: list[int]) -> list[SpinSlotT]:
+    slots: list[SpinSlotT] = []
     row_sum = board.sum(axis=1)
-    if row_holes is None:
-        row_holes = ((board == 0) & (np.cumsum(board, axis=0) < np.sum(board, axis=0))).sum(axis=1)
 
     if max(board_terrain) > 16:
         return []
@@ -38,7 +35,7 @@ def get_t_slots(
     for x in range(NUM_COL - 2):
         # outer(base-level), center, inner(hole)
         center = x + 1
-        for outer, inner, moves, move_x in (
+        for outer, inner, double_moves, double_move_x in (
             (x, x + 2, (3, 3), x),
             (x + 2, x, (1, 1), x + 1),
         ):
@@ -48,13 +45,13 @@ def get_t_slots(
             if board[base_height][inner] == 0 and board[base_height - 1][inner] == 1 and board[base_height + 1][inner] == 1:
                 actual_lines = int(row_sum[base_height] == 7) + int(row_sum[base_height - 1] == 9)
                 slots.append((
-                    moves, move_x, 2,  actual_lines,
+                    double_moves, double_move_x, 2, actual_lines,
                     ((base_height, outer), (base_height, center), (base_height, inner), (base_height - 1, center))
                 ))
 
     # t-spin triple
     for x in range(NUM_COL - 2):
-        for outer_wall, outer, center, inner, inner_wall, moves_single, move_x_single, moves, move_x in (
+        for outer_wall, outer, center, inner, inner_wall, moves_single, move_x_single, triple_moves, triple_move_x in (
             (x + 3, x + 2, x + 1, x, x - 1, (0, 12, 3), x - 1, (1, 3, 3), x),
             (x - 1, x, x + 1, x + 2, x + 3, (0, 11, 1), x + 1, (3, 1, 1), x + 1),
         ):
@@ -88,7 +85,7 @@ def get_t_slots(
                         ))
                     else:
                         slots.append((
-                            moves, move_x, 3, actual_lines,
+                            triple_moves, triple_move_x, 3, actual_lines,
                             ((y-3, outer), (y-4, outer), (y-5, outer), (y-4, center))
                         ))
 
@@ -96,8 +93,8 @@ def get_t_slots(
     return slots
 
 
-def get_mini_t_slots(board, board_terrain):
-    slots = []
+def get_mini_t_slots(board: Board, board_terrain: list[int]) -> list[SpinSlotT]:
+    slots: list[SpinSlotT] = []
     row_sum = board.sum(axis=1)
 
     if max(board_terrain) > 17:
@@ -114,7 +111,7 @@ def get_mini_t_slots(board, board_terrain):
             row_sum[board_terrain[x]] == 7
         )):
             slots.append((
-                (1, 3),  x, 1, 1, 1,
+                (1, 3),  x, 1, 1,
                 ((board_terrain[x], x), (board_terrain[x], x + 1), (board_terrain[x], x + 2), (board_terrain[x] + 1, x + 1))
             ))
     for x in range(NUM_COL - 2):
@@ -127,7 +124,7 @@ def get_mini_t_slots(board, board_terrain):
             row_sum[board_terrain[x+2]] == 7
         )):
             slots.append((
-                (3, 1),  x+1, 1, 1, 1,
+                (3, 1),  x+1, 1, 1,
                 ((board_terrain[x+2], x), (board_terrain[x+2], x + 1), (board_terrain[x+2], x + 2), (board_terrain[x+2] + 1, x + 1))
             ))
 
@@ -140,7 +137,7 @@ def get_mini_t_slots(board, board_terrain):
             row_sum[board_terrain[x + 2] - 1] == 9
         )):
             slots.append((
-                (0, 1), x, 1, 1, 1,
+                (0, 1), x, 1, 1,
                 ((board_terrain[x + 2], x + 1), (board_terrain[x + 2] - 1, x), (board_terrain[x + 2], x), (board_terrain[x + 2] + 1,  x))
             ))
 
@@ -152,9 +149,9 @@ def get_mini_t_slots(board, board_terrain):
             row_sum[board_terrain[x] - 1] == 9
         )):
             slots.append((
-                (0, 3), x, 1, 1, 1,
+                (0, 3), x, 1, 1,
                 ((board_terrain[x], x + 1), (board_terrain[x] - 1, x + 2), (board_terrain[x], x + 2), (board_terrain[x] + 1, x + 2))
             ))
 
-    slots.sort(key=lambda a: (-a[4], a[3]))  # actual_lines desc -> expected_lines asc
+    slots.sort(key=lambda a: (-a[3], a[2]))  # actual_lines desc -> expected_lines asc
     return slots

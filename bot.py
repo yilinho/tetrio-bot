@@ -8,12 +8,19 @@ implemented by :class:`tetrio.TetrioBot`.
 import argparse
 import json
 import os
+import time
 
 import keyboard
 import pyautogui
-import time
 
-from constants import DEFAULT_MOVE_DELAY_MS, DEFAULT_ACTION_DELAY_MS, DEFAULT_DELAY_VARIANCE_PERCENT, DEFAULT_PRUNING_MOVES, DEFAULT_PRUNING_BREADTH, DEFAULT_MP
+from constants import (
+    DEFAULT_ACTION_DELAY_MS,
+    DEFAULT_DELAY_VARIANCE_PERCENT,
+    DEFAULT_MOVE_DELAY_MS,
+    DEFAULT_MP,
+    DEFAULT_PRUNING_BREADTH,
+    DEFAULT_PRUNING_MOVES,
+)
 from tetrio import TetrioBot
 
 CONFIG_FILE = "config.json"
@@ -34,7 +41,7 @@ def load_config():
             if 'delay_variance_percent' not in config:
                 config['delay_variance_percent'] = DEFAULT_DELAY_VARIANCE_PERCENT
             return config
-        except (json.JSONDecodeError, IOError) as e:
+        except (OSError, json.JSONDecodeError) as e:
             print(f"Warning: Could not load config file: {e}")
     return None
 
@@ -123,44 +130,44 @@ def run_calibration_wizard():
         screen_offset = (primary_width, 0)
     
     # Ask user about screen offset
-    print(f"\n--- Screen Offset Detection ---")
+    print("\n--- Screen Offset Detection ---")
     print(f"  Detected board position: ({board_top_left[0]}, {board_top_left[1]})")
     print(f"  Suggested screen_offset: {screen_offset}")
-    print(f"\n  If your game is on a secondary monitor, you may need to adjust this.")
-    print(f"  Common values: (0, 0) for primary, (-1920, 0) for left monitor,")
-    print(f"  (1920, 0) for right monitor")
+    print("\n  If your game is on a secondary monitor, you may need to adjust this.")
+    print("  Common values: (0, 0) for primary, (-1920, 0) for left monitor,")
+    print("  (1920, 0) for right monitor")
     
     # Get screen resolution (use the board area to estimate)
     screen_resolution = (primary_width, primary_height)
     
     # Prompt for delay settings
-    print(f"\n--- Step 6/6: DELAY SETTINGS ---")
+    print("\n--- Step 6/6: DELAY SETTINGS ---")
     print("  Configure delays to make inputs appear more human-like.")
     print("  This helps avoid anti-cheat detection.\n")
     
     print(f"  Move Delay: Delay between each keypress (default: {DEFAULT_MOVE_DELAY_MS}ms)")
-    move_delay_input = input(f"  Enter move delay in ms (or press Enter for default): ").strip()
+    move_delay_input = input("  Enter move delay in ms (or press Enter for default): ").strip()
     move_delay_ms = int(move_delay_input) if move_delay_input else DEFAULT_MOVE_DELAY_MS
     
     print(f"\n  Action Delay: Delay after actions like hold/rotate (default: {DEFAULT_ACTION_DELAY_MS}ms)")
-    action_delay_input = input(f"  Enter action delay in ms (or press Enter for default): ").strip()
+    action_delay_input = input("  Enter action delay in ms (or press Enter for default): ").strip()
     action_delay_ms = int(action_delay_input) if action_delay_input else DEFAULT_ACTION_DELAY_MS
     
     print(f"\n  Delay Variance: Random variance percentage (default: {DEFAULT_DELAY_VARIANCE_PERCENT}%)")
     print("  Example: 20% variance on 30ms = delays between 24ms-36ms")
-    variance_input = input(f"  Enter variance percentage (or press Enter for default): ").strip()
+    variance_input = input("  Enter variance percentage (or press Enter for default): ").strip()
     delay_variance_percent = int(variance_input) if variance_input else DEFAULT_DELAY_VARIANCE_PERCENT
 
     print(f"\n  Pruning Moves: Number of candidate moves to keep (default: {DEFAULT_PRUNING_MOVES})")
-    pruning_moves_input = input(f"  Enter pruning moves (or press Enter for default): ").strip()
+    pruning_moves_input = input("  Enter pruning moves (or press Enter for default): ").strip()
     pruning_moves = int(pruning_moves_input) if pruning_moves_input else DEFAULT_PRUNING_MOVES
 
     print(f"\n  Pruning Breadth: Number of future results to keep (default: {DEFAULT_PRUNING_BREADTH})")
-    pruning_breadth_input = input(f"  Enter pruning breadth (or press Enter for default): ").strip()
+    pruning_breadth_input = input("  Enter pruning breadth (or press Enter for default): ").strip()
     pruning_breadth = int(pruning_breadth_input) if pruning_breadth_input else DEFAULT_PRUNING_BREADTH
 
     print(f"\n  Multiprocessing Workers (default: {DEFAULT_MP})")
-    mp_input = input(f"  Enter multiprocessing workers (or press Enter for default): ").strip()
+    mp_input = input("  Enter multiprocessing workers (or press Enter for default): ").strip()
     mp = int(mp_input) if mp_input else DEFAULT_MP
     
     # Build the configuration
@@ -190,7 +197,7 @@ def run_calibration_wizard():
     print(f"  Next Piece #1:      ({next_piece_0[0]}, {next_piece_0[1]})")
     print(f"  Next Piece #5:      ({next_piece_4[0]}, {next_piece_4[1]})")
     print(f"  Held Piece:         ({held_piece[0]}, {held_piece[1]})")
-    print(f"\nDelay settings:")
+    print("\nDelay settings:")
     print(f"  Move Delay:         {move_delay_ms}ms")
     print(f"  Action Delay:       {action_delay_ms}ms")
     print(f"  Delay Variance:     {delay_variance_percent}%")

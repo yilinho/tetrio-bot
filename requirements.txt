@@ -1,4 +1,8 @@
 keyboard
+types-keyboard
 numpy
 pillow
 pyautogui
+types-PyAutoGUI
+mypy
+ruff

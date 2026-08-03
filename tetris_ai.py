@@ -1,13 +1,23 @@
 """Search and evaluate candidate TETR.IO moves."""
 
-import numpy as np
+from collections.abc import Iterable, Iterator, Sequence
+from multiprocessing.pool import Pool
+from typing import Any, TypeAlias
 
-from constants import tetris_pieces_trimmed, NUM_ROW, NUM_COL
+import numpy as np
+from numpy.typing import NDArray
+
+import weights
+from constants import NUM_COL, NUM_ROW, tetris_pieces_trimmed
 from spin_i import get_i_slots
 from spin_jl import get_j_slots, get_l_slots
-from spin_t import get_t_slots, get_mini_t_slots
+from spin_t import get_mini_t_slots, get_t_slots
 from spin_zs import get_s_slots, get_z_slots
-import weights
+from type_defs import Board, Coordinate, Rotation, SpinSlot
+
+MoveCandidate: TypeAlias = tuple[float, int, Rotation, float, int, int, Board]
+PlacedMove: TypeAlias = tuple[int, Rotation, int, int, int, Board]
+FutureState: TypeAlias = tuple[float, Board, float, int, int, str]
 
 T_SPIN_MAX_HEIGHT = 10
 TRIPLE_T_SPIN_MAX_HEIGHT = 8
@@ -21,8 +31,23 @@ dead_board = np.zeros((NUM_ROW, NUM_COL), dtype=np.int32)
 dead_board[:, 0] = 1
 
 
-def find_best_move(current_board, current_piece, next_pieces, held_piece, combo, b2b, pruning_moves, pruning_breadth, mp_pool):
-    all_moves = []
+def find_best_move(
+    current_board: Board,
+    current_piece: str,
+    next_pieces: Sequence[str],
+    held_piece: str,
+    combo: int,
+    b2b: int,
+    pruning_moves: int,
+    pruning_breadth: int,
+    mp_pool: Pool | None,
+) -> tuple[float, tuple[int, Rotation, bool, int, int, Board]]:
+    all_moves: list[
+        tuple[
+            tuple[int, Rotation, bool, int, int, Board],
+            list[tuple[float, Board, float, int, int, str]],
+        ]
+    ] = []
 
     # Calculate the first-move Hold preference.
     # Try to release T when there's t-slot, hold it otherwise
@@ -42,65 +67,65 @@ def find_best_move(current_board, current_piece, next_pieces, held_piece, combo,
     for new_score, position, rotations, extra_score, new_combo, new_b2b, new_board in _find_best_move(
         (current_board, current_piece, combo, b2b)
     ):
-        all_moves.append([
+        all_moves.append((
             (position, rotations, False, new_combo, new_b2b, new_board),
             [(
                 new_score, new_board, extra_score, new_combo, new_b2b, held_piece
             )]
-        ])
+        ))
 
     if held_piece != current_piece:  # no point to switch
         for new_score, position, rotations, extra_score, new_combo, new_b2b, new_board in _find_best_move(
             (current_board, held_piece, combo, b2b)
         ):
-            all_moves.append([
+            all_moves.append((
                 (position, rotations, True, new_combo, new_b2b, new_board),
                 [(
                     new_score + switch_extra, new_board, extra_score, new_combo, new_b2b, current_piece
                 )]
-            ])
+            ))
 
     all_moves.sort(reverse=True, key=lambda x: x[1][0][0])
 
     while next_pieces:
         current_piece, next_pieces = next_pieces[0], next_pieces[1:]
-        next_results = []
+        next_results: list[list[FutureState]] = []
         map_args = []
         for idx, _ in enumerate(all_moves):
             next_results.append([])
-            for _, board, _, combo, b2b, held_piece in all_moves[idx][1]:
-                map_args.append((board, current_piece, combo, b2b))
-                if held_piece != current_piece:  # no point to switch
-                    map_args.append((board, held_piece, combo, b2b))
+            for _, _board, _, _combo, _b2b, _held_piece in all_moves[idx][1]:
+                map_args.append((_board, current_piece, _combo, _b2b))
+                if _held_piece != current_piece:  # no point to switch
+                    map_args.append((_board, _held_piece, _combo, _b2b))
 
         if mp_pool is None or len(map_args) < 10:
-            map_res = map(_find_best_move, map_args)
+            map_res: Iterator[Iterable[MoveCandidate]] = map(_find_best_move, map_args)
         else:
             # print(len(map_args))
             map_res = iter(mp_pool.map(_find_best_move, map_args))
 
         for idx, _ in enumerate(all_moves):
             switch = all_moves[idx][0][2]
-            for score, board, extra_score, combo, b2b, held_piece in all_moves[idx][1]:
+            for _score, _, _extra_score, _, _, _held_piece in all_moves[idx][1]:
                 for new_score, _, _, new_extra_score, new_combo, new_b2b, new_board in next(map_res):
                     next_results[idx].append((
-                        weights.CURRENT_MOVE_WEIGHT * score + weights.LOOKAHEAD_WEIGHT * (new_score + extra_score + (switch_extra if switch else 0)), new_board,
-                        extra_score + new_extra_score, new_combo, new_b2b, held_piece
+                        weights.CURRENT_MOVE_WEIGHT * _score + weights.LOOKAHEAD_WEIGHT * (new_score + _extra_score + (switch_extra if switch else 0)), new_board,
+                        _extra_score + new_extra_score, new_combo, new_b2b, _held_piece
                     ))
 
-                if held_piece != current_piece:  # no point to switch
+                if _held_piece != current_piece:  # no point to switch
                     for new_score, _, _, new_extra_score, new_combo, new_b2b, new_board in next(map_res):
                         next_results[idx].append((
-                            weights.CURRENT_MOVE_WEIGHT * score + weights.LOOKAHEAD_WEIGHT * (new_score + extra_score + (switch_extra if switch else 0)), new_board,
-                            extra_score + new_extra_score, new_combo, new_b2b, current_piece
+                            weights.CURRENT_MOVE_WEIGHT * _score + weights.LOOKAHEAD_WEIGHT * (new_score + _extra_score + (switch_extra if switch else 0)), new_board,
+                            _extra_score + new_extra_score, new_combo, new_b2b, current_piece
                         ))
 
         for idx, _ in enumerate(all_moves):
             next_results[idx].sort(reverse=True, key=lambda x: x[0])
             if not next_results[idx]:
-                all_moves[idx][1] = [(weights.DEAD_MOVE_SCORE, dead_board, 0, 0, 0, "Z")]
+                all_moves[idx] = (all_moves[idx][0], [(weights.DEAD_MOVE_SCORE, dead_board, 0, 0, 0, "Z")])
             else:
-                all_moves[idx][1] = next_results[idx][:pruning_breadth]
+                all_moves[idx] = (all_moves[idx][0], next_results[idx][:pruning_breadth])
         all_moves.sort(reverse=True, key=lambda x: x[1][0][0])
         all_moves = all_moves[:max(pruning_moves, len(all_moves) // 2)]
 
@@ -110,7 +135,12 @@ def find_best_move(current_board, current_piece, next_pieces, held_piece, combo,
     return best_move[1][0][0], best_move[0]
 
 
-def get_all_possible_moves(piece, board, board_terrain, b2b):
+def get_all_possible_moves(
+    piece: str,
+    board: Board,
+    board_terrain: list[int],
+    b2b: int,
+) -> Iterable[PlacedMove]:
     if piece == "T":  # t-spin moves
         for rot, pos, expected_lines, actual_lines, blocks in get_t_slots(board, board_terrain):
             new_board = board.copy()
@@ -137,7 +167,7 @@ def get_all_possible_moves(piece, board, board_terrain, b2b):
                 new_b2b = b2b
             yield pos, rot, extra_score, num_clear_rows, new_b2b, new_board
 
-        for rot, pos, _, _, _, blocks in get_mini_t_slots(board, board_terrain):
+        for rot, pos, _, _, blocks in get_mini_t_slots(board, board_terrain):
             new_board = board.copy()
             for y, x in blocks:
                 new_board[y][x] = 1
@@ -156,6 +186,7 @@ def get_all_possible_moves(piece, board, board_terrain, b2b):
             yield pos, rot, extra_score, num_clear_rows, new_b2b, new_board
 
     else:  # other spin moves. These moves don't give extra score but benefit to b2b counts.
+        slots: list[SpinSlot] = []
         match piece:
             case "S":
                 slots = get_s_slots(board, board_terrain)
@@ -168,7 +199,7 @@ def get_all_possible_moves(piece, board, board_terrain, b2b):
             case "J":
                 slots = get_j_slots(board, board_terrain)
             case _:
-                slots = []
+                pass
         for rot, pos, blocks in slots:
             new_board = board.copy()
             for y, x in blocks:
@@ -193,10 +224,10 @@ def get_all_possible_moves(piece, board, board_terrain, b2b):
     for rotation, (piece_shape, piece_terrain) in enumerate(tetris_pieces_trimmed[piece]):
         positions = get_positions(board_terrain, piece_terrain)
         for position in positions:
-            new_board = place_piece(board, piece_shape, position)
-            if new_board is None:
+            placed_board = place_piece(board, piece_shape, position)
+            if placed_board is None:
                 continue
-            num_clear_rows = clear_full_rows(new_board)
+            num_clear_rows = clear_full_rows(placed_board)
 
             if num_clear_rows == 4:
                 new_b2b = b2b + 1
@@ -204,10 +235,10 @@ def get_all_possible_moves(piece, board, board_terrain, b2b):
                 new_b2b = 0
             else:
                 new_b2b = b2b
-            yield position[1], (rotation,), 0, num_clear_rows, new_b2b, new_board
+            yield position[1], (rotation,), 0, num_clear_rows, new_b2b, placed_board
 
 
-def _find_best_move(args):
+def _find_best_move(args: tuple[Board, str, int, int]) -> Iterable[MoveCandidate]:
     current_board, current_piece, combo, b2b = args
     scores = []
     board_terrain = _get_board_terrain(current_board)
@@ -235,11 +266,11 @@ def _find_best_move(args):
     return scores
 
 
-def get_positions(board_terrain, piece_terrain):
+def get_positions(board_terrain: list[int], piece_terrain: Sequence[int] | NDArray[np.integer[Any]]) -> list[Coordinate]:
     return [(max(board_terrain[x + i] - ht for i, ht in enumerate(piece_terrain)), x) for x in range(NUM_COL - len(piece_terrain) + 1)]
 
 
-def place_piece(board, piece_shape, position):
+def place_piece(board: Board, piece_shape: Board, position: Coordinate) -> Board | None:
     board = board.copy()
     try:
         board[position[0]:position[0] + piece_shape.shape[0], position[1]:position[1] + piece_shape.shape[1]] += piece_shape
@@ -248,7 +279,7 @@ def place_piece(board, piece_shape, position):
     return board
 
 
-def clear_full_rows(board):
+def clear_full_rows(board: Board) -> int:
     non_full_rows = np.not_equal(board.sum(axis=1), NUM_COL)
     r = NUM_ROW - int(non_full_rows.sum())
     if r > 0:
@@ -258,22 +289,11 @@ def clear_full_rows(board):
     return r
 
 
-def _get_board_terrain(board):
+def _get_board_terrain(board: Board) -> list[int]:
     return [int((column * range_1_20).max()) for column in board.T]
 
 
-def _has_i_slot(board, board_terrain):
-    board_terrain_sorted = sorted(board_terrain)
-    if board_terrain_sorted[0] + 4 > board_terrain_sorted[1]:
-        return False, 0
-    for x, h in enumerate(board_terrain):
-        if h == board_terrain_sorted[0]:
-            row_sum = board.sum(axis=1)
-            return (row_sum[h] == 9 and row_sum[h+1] == 9 and row_sum[h+2] == 9 and row_sum[h+3] == 9), x
-    return False, 0
-
-
-def evaluate_board(board):
+def evaluate_board(board: Board) -> float:
     score = 0
 
     board_terrain = _get_board_terrain(board)
@@ -314,8 +334,8 @@ def evaluate_board(board):
 
     board_terrain_sorted = sorted(board_terrain)
     current_max_height = board_terrain_sorted[-1]
-    if current_max_height == 0:  # prefect clear
-        print("Prefect clear !!")
+    if current_max_height == 0:  # perfect clear
+        print("Perfect clear !!")
         return weights.PERFECT_CLEAR_SCORE
 
     for _threshold, _linear_weight, _quadratic_weight in weights.HEIGHT_PENALTIES:
@@ -336,9 +356,9 @@ def evaluate_board(board):
                 break
 
     # t slots logic below
-    t_slots = get_t_slots(board, board_terrain, row_holes=row_holes)
+    t_slots = get_t_slots(board, board_terrain)
     triple_count = 0
-    for _, pos, expected_lines, actual_lines, _ in t_slots:
+    for _, _, expected_lines, actual_lines, _ in t_slots:
         if expected_lines == 3:
             triple_count += 1
             if current_max_height < TRIPLE_T_SPIN_MAX_HEIGHT:

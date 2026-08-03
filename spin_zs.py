@@ -1,10 +1,11 @@
 """Detect special S/Z-piece slots and spin placements."""
 
 from constants import NUM_COL
+from type_defs import Board, SpinSlot
 
 
-def get_s_slots(board, board_terrain):
-    slots = []
+def get_s_slots(board: Board, board_terrain: list[int]) -> list[SpinSlot]:
+    slots: list[SpinSlot] = []
 
     if max(board_terrain) > 18:
         return []
@@ -23,8 +24,8 @@ def get_s_slots(board, board_terrain):
     return slots
 
 
-def get_z_slots(board, board_terrain):
-    slots = []
+def get_z_slots(board: Board, board_terrain: list[int]) -> list[SpinSlot]:
+    slots: list[SpinSlot] = []
 
     if max(board_terrain) > 18:
         return []

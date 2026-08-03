@@ -6,20 +6,18 @@ corresponding keyboard actions. Configuration and calibration remain in
 ``bot.py``.
 """
 
+import math
 import random
 import time
 from multiprocessing import Pool
 
 import keyboard
 import numpy as np
-import math
 from PIL import ImageGrab
 from PIL.Image import Image
 
-from constants import colors, colors_name, tetris_pieces, NUM_ROW, NUM_COL
-
+from constants import NUM_COL, NUM_ROW, colors, colors_name, tetris_pieces
 from tetris_ai import find_best_move
-
 
 # keybinds
 rotate_clockwise_key = 'x'
